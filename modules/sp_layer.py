@@ -51,6 +51,26 @@ SIGN_POSE_SKELETON = [
     [(2, 3, "RightElbow"), (5, 6, "LeftElbow")],
     [(3, 4, "RightWrist"), (6, 7, "LeftWrist")]]
 
+# 19-joint body skeleton for 61-keypoint format.
+# Joints 0-18 as defined in user skeleton; root = joint 6 (Right Hip).
+# BFS from joint 6 over BODY_CONNECTIONS (undirected):
+#   6->0,7 | 0->1,8 | 7->3 | 1->2 | 8->9,12,15,16 | 3->4 | 9->10 | 12->13
+#   10->11 | 13->14 | 11->(15 already seen) | 14->(16 already seen)
+#   15->17 | 16->(already done) | 17->18
+# Mouth (17,18): connected only to each other; 17's BFS parent = 15 (LeftEar,
+# reachable via face-left chain 8->9->10->11->15), 18's parent = 17.
+SIGN_POSE_SKELETON_19 = [
+    [(-1, 6, "RightHip")],
+    [(6, 0, "RightShoulder"), (6, 7, "LeftHip")],
+    [(0, 1, "RightElbow"), (0, 8, "Nose"), (7, 3, "LeftShoulder")],
+    [(1, 2, "RightWrist"), (8, 9, "LeftEyeInner"), (8, 12, "RightEyeInner"), (3, 4, "LeftElbow")],
+    [(9, 10, "LeftEye"), (12, 13, "RightEye"), (4, 5, "LeftWrist")],
+    [(10, 11, "LeftEyeOuter"), (13, 14, "RightEyeOuter")],
+    [(11, 15, "LeftEar"), (14, 16, "RightEar")],
+    [(15, 17, "MouthLeft")],
+    [(17, 18, "MouthRight")],
+]
+
 SIGN_HAND_SKELETON = [
     [(-1, 0, "Wrist")],
     [(0, 1, "hand1"), (0, 5, "hand5"), (0, 9, "hand9"), (0, 13, "hand13"), (0, 17, "hand17")],
@@ -72,6 +92,9 @@ class SPL(nn.Module):
         if SKELETON == "sign_pose":
             self.skeleton = SIGN_POSE_SKELETON  # 选择数据集
             self.num_joints = 8  # 关节点数
+        elif SKELETON == "sign_pose_19":
+            self.skeleton = SIGN_POSE_SKELETON_19
+            self.num_joints = 19
         elif SKELETON == "sign_hand":
             self.skeleton = SIGN_HAND_SKELETON   # 选择数据集
             self.num_joints = 21          # 关节点数

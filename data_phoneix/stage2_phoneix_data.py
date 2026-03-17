@@ -77,8 +77,8 @@ class PoseDataset(data.Dataset):
                 skels_3d = torch.FloatTensor([float(s) for s in skel_line.strip().split()])
                 # print("len(skels_3d): ", len(skels_3d))
 
-                assert len(skels_3d) % 151 == 0
-                skel_len = len(skels_3d) // 151
+                assert len(skels_3d) % 184 == 0
+                skel_len = len(skels_3d) // 184
                 
 
                 self.gloss.append(gloss)
@@ -101,7 +101,7 @@ class PoseDataset(data.Dataset):
         skel_len = self.skel_len[idx]
         
         skel_len = skel_len # // 4 * 4
-        skel_3d = skel_3d[:skel_len * 151]
+        skel_3d = skel_3d[:skel_len * 184]
         
         return dict(gloss=gloss, pred_len=pred_len, gloss_id=gloss_id, skel_3d=skel_3d, gloss_len=gloss_len, skel_len=skel_len)
 
@@ -110,8 +110,8 @@ class PoseDataset(data.Dataset):
         skel_3d = self.collate_points([x["skel_3d"] for x in batch], pad_idx=0.)
 
         bs, max_len = skel_3d.size()
-        assert max_len % 151 ==0
-        skel_3d = skel_3d.view(bs, -1, 151)[:, :, :-1].contiguous() # [bs, max_len, 150]
+        assert max_len % 184 == 0
+        skel_3d = skel_3d.view(bs, -1, 184)[:, :, :-1].contiguous() # [bs, max_len, 183]
 
         gloss = [x["gloss"] for x in batch]
         pred_len = [x["pred_len"] for x in batch]

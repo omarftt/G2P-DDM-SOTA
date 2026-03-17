@@ -57,6 +57,7 @@ class PoseDataset(data.Dataset):
         skel_file = os.path.join(opts.data_path, "{}.skels".format(tag))
         file_path = os.path.join(opts.data_path, "{}.files".format(tag))
         leng_file = os.path.join(opts.data_path, "{}.leng".format(tag))
+        meta_file = os.path.join(opts.data_path, "{}.meta".format(tag))
 
         text_dict = Dictionary()
 
@@ -70,7 +71,15 @@ class PoseDataset(data.Dataset):
         self.gloss_len = []
         self.vid_path = []
         self.pred_leng = []
+        self.names = []
+        self.signers = []
+        self.texts = []
 
+        import json as _json
+        _meta_lines = []
+        if os.path.exists(meta_file):
+            with open(meta_file, "r") as _fm:
+                _meta_lines = _fm.readlines()
 
         with open(gloss_file, "r") as f1, open(skel_file, "r") as f2, open(leng_file, "r") as f3:
             for i, (gloss_line, skel_line, leng_line) in enumerate(zip(f1, f2, f3)):
@@ -84,16 +93,19 @@ class PoseDataset(data.Dataset):
 
                 # vid_path = os.path.join("/Dataset/everybody_sign_now_experiments/images", file_line.strip())
 
-                assert len(skels_3d) % 151 == 0
-                skel_len = len(skels_3d) // 151
+                assert len(skels_3d) % 184 == 0
+                skel_len = len(skels_3d) // 184
 
+                meta = _json.loads(_meta_lines[i]) if i < len(_meta_lines) else {}
                 self.gloss.append(gloss)
-                self.gloss_id.append(gloss_ids)         
-                self.skel_3d.append(skels_3d)         
-                self.skel_len.append(skel_len)  
-                self.gloss_len.append(gloss_len) 
-                # self.vid_path.append(vid_path) 
+                self.gloss_id.append(gloss_ids)
+                self.skel_3d.append(skels_3d)
+                self.skel_len.append(skel_len)
+                self.gloss_len.append(gloss_len)
                 self.pred_leng.append(pred_leng)
+                self.names.append(meta.get('name', ''))
+                self.signers.append(meta.get('signer', ''))
+                self.texts.append(meta.get('text', ''))
 
         self.input_shape = 128
         self.transform = transforms.Compose([
@@ -114,7 +126,7 @@ class PoseDataset(data.Dataset):
         skel_len = self.skel_len[idx]
 
         skel_len = skel_len // 4 * 4
-        skel_3d = skel_3d[:skel_len * 151]
+        skel_3d = skel_3d[:skel_len * 184]
 
         # skel_3d_2d = skel_3d.reshape(skel_len, 151)
         
@@ -129,7 +141,9 @@ class PoseDataset(data.Dataset):
         #     im = self.transform(im)
         #     imgs.append(im.unsqueeze(0))
         # imgs = torch.cat(imgs, dim=0)
-        return dict(gloss=gloss, pred_len=pred_len, gloss_id=gloss_id, skel_3d=skel_3d, gloss_len=gloss_len, skel_len=skel_len)
+        return dict(gloss=gloss, pred_len=pred_len, gloss_id=gloss_id, skel_3d=skel_3d,
+                    gloss_len=gloss_len, skel_len=skel_len,
+                    name=self.names[idx], signer=self.signers[idx], text=self.texts[idx])
 
 
     def get_images(self, video_name):
@@ -153,7 +167,7 @@ class PoseDataset(data.Dataset):
         skel_3d = self.collate_points([x["skel_3d"] for x in batch], pad_idx=0.)
 
         bs = gloss_id.size(0)
-        skel_3d = skel_3d.view(bs, -1, 151)[:, :, :-1].contiguous() # [bs, max_len, 150]
+        skel_3d = skel_3d.view(bs, -1, 184)[:, :, :-1].contiguous() # [bs, max_len, 183]
 
         gloss = [x["gloss"] for x in batch]
         pred_len = [x["pred_len"] for x in batch]
@@ -168,7 +182,12 @@ class PoseDataset(data.Dataset):
         #     video[i, :skel_len[i].item(), ...] = vids[i]
 
         # video /= 255.
-        return dict(gloss=gloss, pred_len=pred_len, gloss_id=gloss_id.long(), skel_3d=skel_3d, skel_len=skel_len, gloss_len=gloss_len) #, vid=video)
+        name   = [x["name"]   for x in batch]
+        signer = [x["signer"] for x in batch]
+        text   = [x["text"]   for x in batch]
+        return dict(gloss=gloss, pred_len=pred_len, gloss_id=gloss_id.long(), skel_3d=skel_3d,
+                    skel_len=skel_len, gloss_len=gloss_len,
+                    name=name, signer=signer, text=text)
 
 
     def collate_points(self, values, pad_idx, left_pad=False):

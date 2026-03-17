@@ -36,7 +36,7 @@ def main():
         print("=== {} is not existed!".format(opt.resume_ckpt))
 
     callbacks = []
-    model_save_ccallback = ModelCheckpoint(monitor="val_rec_loss", filename='{epoch}-{step}-{val_wer:.4f}-{val_rec_loss:.4f}-{val_ce_loss:.4f}', save_top_k=10, mode="min")
+    model_save_ccallback = ModelCheckpoint(monitor="val_rec_loss", filename='{epoch}-{step}-{val_wer:.4f}-{val_rec_loss:.4f}-{val_ce_loss:.4f}', save_top_k=1, save_last=True, mode="min")
     # early_stop_callback = EarlyStopping(monitor="val_rec_loss", min_delta=0.00, patience=5, verbose=False, mode="min")
     callbacks.append(model_save_ccallback)
     # callbacks.append(early_stop_callback)

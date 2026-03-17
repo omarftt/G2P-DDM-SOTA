@@ -131,15 +131,8 @@ class Point2textModelStage2(pl.LightningModule):
         self.vqvae.codebook._need_init = False
         self.vqvae.eval()
 
-        back_translate_model1 = instantiate_from_config(backtrans_model_config, init_model=False)
-        if not os.path.exists(backtrans_model_config.ckpt_path):
-            raise ValueError("{} is not existed!".format(backtrans_model_config.ckpt_path))
-        else:
-            print("=== load back-translate model from {}".format(backtrans_model_config.ckpt_path))
-            self.back_translate_model1 =  back_translate_model1.load_from_checkpoint(backtrans_model_config.ckpt_path)
-        for p in self.back_translate_model1.parameters():
-            p.requires_grad = False
-        self.back_translate_model1.eval()
+        self.back_translate_model1 = None
+        print("=== Back-translate checkpoint not used — WER metric disabled ===")
 
         # encoder-decoder
         self.gloss_embedding = nn.Embedding(len(self.text_dict), hidden_size, self.text_dict.pad())
@@ -597,36 +590,27 @@ class Point2textModelStage2(pl.LightningModule):
         pred_points = einops.rearrange(pred_points, "(b t) v -> b t v", b=bs) # [b max_len/3 v]
 
         ori_points = batch["skel_3d"]
-        if batch_idx < 2:
-            for i in range(bs):
-                pred_show_img = []
-                ori_show_img = []
-                pred_cur_points = pred_points[i, :tgt_len[i].item()].detach().cpu().numpy() # [cur_len, 150]
-                ori_cur_points = ori_points[i, :tgt_len[i].item()].detach().cpu().numpy() # [cur_len, 150]
-                for j in range(pred_cur_points.shape[0]):
-                    frame_joints = pred_cur_points[j]
-                    frame = np.ones((512, 512, 3), np.uint8) * 255
-                    frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
-                    # Draw the frame given 2D joints
-                    im = draw_frame_2D(frame, frame_joints_2d)
-                    pred_show_img.append(im)
-                for j in range(ori_cur_points.shape[0]):
-                    frame_joints = ori_cur_points[j]
-                    frame = np.ones((512, 512, 3), np.uint8) * 255
-                    frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
-                    # Draw the frame given 2D joints
-                    im = draw_frame_2D(frame, frame_joints_2d)
-                    ori_show_img.append(im)
-                pred_show_img = np.concatenate(pred_show_img, axis=1) # [h, w, c]
-                ori_show_img = np.concatenate(ori_show_img, axis=1) # [h, w, c]
-                show_img = np.concatenate([pred_show_img, ori_show_img], axis=0)
-                save_dir = os.path.join(self.sample_dir, NOW_TIME)
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                cv2.imwrite("{}/epoch={}_batch={}_idx={}.png".format(save_dir, self.current_epoch, batch_idx, i), show_img)
-                # show_img = torch.FloatTensor(show_img).permute(2, 0, 1).contiguous().unsqueeze(0) # [1, c, h ,w]
-                # show_img = torchvision.utils.make_grid(show_img, )
-                # self.logger.experiment.add_image("{}/{}_batch_{}_{}".format("test", "pred", batch_idx, i), show_img, self.global_step)
+        if batch_idx == 0:
+            i = 0
+            pred_show_img = []
+            ori_show_img = []
+            pred_cur_points = pred_points[i, :tgt_len[i].item()].detach().cpu().numpy()
+            ori_cur_points = ori_points[i, :tgt_len[i].item()].detach().cpu().numpy()
+            for j in range(pred_cur_points.shape[0]):
+                frame_joints = pred_cur_points[j]
+                frame = np.ones((512, 512, 3), np.uint8) * 255
+                frame_joints_2d = np.reshape(frame_joints, (61, 3))[:, :2]
+                pred_show_img.append(draw_frame_2D(frame, frame_joints_2d))
+            for j in range(ori_cur_points.shape[0]):
+                frame_joints = ori_cur_points[j]
+                frame = np.ones((512, 512, 3), np.uint8) * 255
+                frame_joints_2d = np.reshape(frame_joints, (61, 3))[:, :2]
+                ori_show_img.append(draw_frame_2D(frame, frame_joints_2d))
+            pred_show_img = np.concatenate(pred_show_img, axis=1)
+            ori_show_img = np.concatenate(ori_show_img, axis=1)
+            show_img = np.concatenate([pred_show_img, ori_show_img], axis=0)
+            os.makedirs(self.sample_dir, exist_ok=True)
+            cv2.imwrite(os.path.join(self.sample_dir, "latest_val.png"), show_img)
         return pred_points, tgt_len
 
     def validation_step(self, batch, batch_idx):
@@ -640,44 +624,97 @@ class Point2textModelStage2(pl.LightningModule):
         bs = gloss_id.size(0)
 
         pred_points, tgt_len = self.generate(batch, batch_idx)
-        rec_res1 = self._compute_wer(pred_points, skel_len, gloss_id, gloss_len, "test", self.back_translate_model1)
-        ori_res1 = self._compute_wer(ori_points, skel_len, gloss_id, gloss_len, "test", self.back_translate_model1)
 
         dtw_scores = []
         for i in range(bs):
             dec_point = pred_points[i, :skel_len[i].item(), :].cpu().numpy()
             ori_point = ori_points[i, :skel_len[i].item(), :].cpu().numpy()
-            
             euclidean_norm = lambda x, y: np.sum(np.abs(x - y))
             d, cost_matrix, acc_cost_matrix, path = dtw(dec_point, ori_point, dist=euclidean_norm)
+            dtw_scores.append(d / acc_cost_matrix.shape[0])
 
-            # Normalise the dtw cost by sequence length
-            dtw_scores.append(d/acc_cost_matrix.shape[0])
-        
-        # return rec_res1, ori_res1, dtw_scores, rec_res2, ori_res2
-        return rec_res1, ori_res1, dtw_scores
+        if self.back_translate_model1 is not None:
+            rec_res1 = self._compute_wer(pred_points, skel_len, gloss_id, gloss_len, "test", self.back_translate_model1)
+            ori_res1 = self._compute_wer(ori_points, skel_len, gloss_id, gloss_len, "test", self.back_translate_model1)
+            return rec_res1, ori_res1, dtw_scores
+        return None, None, dtw_scores
 
 
     def validation_epoch_end(self, outputs) -> None:
+        dtw_scores = []
         rec_err, rec_correct, rec_count = np.zeros([4]), 0, 0
         ori_err, ori_correct, ori_count = np.zeros([4]), 0, 0
-        dtw_scores = []
         for rec_out, ori_out, dtw in outputs:
-            rec_err += rec_out["wer"]
-            rec_correct += rec_out["correct"]
-            rec_count += rec_out["count"]
-            ori_err += ori_out["wer"]
-            ori_correct += ori_out["correct"]
-            ori_count += ori_out["count"]
-            
             dtw_scores.extend(dtw)
+            if rec_out is not None:
+                rec_err += rec_out["wer"]
+                rec_correct += rec_out["correct"]
+                rec_count += rec_out["count"]
+                ori_err += ori_out["wer"]
+                ori_correct += ori_out["correct"]
+                ori_count += ori_out["count"]
 
-        # self.log('{}/rec_acc'.format("val"), rec_correct / rec_count, prog_bar=True, sync_dist=True)
-        self.log('{}/rec_wer'.format("val"), rec_err[0] / rec_count, prog_bar=True, sync_dist=True)
-        # self.log('{}/ori_acc'.format("val"), ori_correct / ori_count, prog_bar=True, sync_dist=True)
-        self.log('{}/ori_wer'.format("val"), ori_err[0] / ori_count, prog_bar=True, sync_dist=True)
         self.log('{}/rec_dtw'.format("val"), sum(dtw_scores) / len(dtw_scores), prog_bar=True, sync_dist=True)
+        if rec_count > 0:
+            self.log('{}/rec_wer'.format("val"), rec_err[0] / rec_count, prog_bar=True, sync_dist=True)
+            self.log('{}/ori_wer'.format("val"), ori_err[0] / ori_count, prog_bar=True, sync_dist=True)
     
+    def test_step(self, batch, batch_idx):
+        self.vqvae.eval()
+        pred_points, tgt_len = self.generate(batch, batch_idx)
+        # pred_points: (bs, max_len, 183) — normalized
+        gloss_list  = batch["gloss"]    # list of str
+        name_list   = batch.get("name",   [""] * pred_points.shape[0])
+        signer_list = batch.get("signer", [""] * pred_points.shape[0])
+        text_list   = batch.get("text",   [""] * pred_points.shape[0])
+
+        if not hasattr(self, '_test_outputs'):
+            self._test_outputs = []
+
+        bs = pred_points.shape[0]
+        for i in range(bs):
+            length = int(tgt_len[i].item())
+            length = max(16, min(300, length))
+            gloss_str = gloss_list[i]
+            if not isinstance(gloss_str, str):
+                gloss_str = ' '.join(g.upper() for g in gloss_str)
+            else:
+                gloss_str = gloss_str.upper()
+            self._test_outputs.append({
+                'sign':   pred_points[i, :length].cpu().float(),
+                'gloss':  gloss_str,
+                'text':   str(text_list[i]).lower(),
+                'name':   str(name_list[i]),
+                'signer': str(signer_list[i]),
+            })
+
+    def on_test_epoch_end(self):
+        if self.global_rank != 0:
+            return
+        mean = np.load('Data/ProgressiveTransformersSLP/mean_183.npy')
+        std  = np.load('Data/ProgressiveTransformersSLP/std_183.npy')
+        mean_t = torch.FloatTensor(mean)
+        std_t  = torch.FloatTensor(std)
+
+        results = []
+        for item in getattr(self, '_test_outputs', []):
+            sign = item['sign'] * std_t + mean_t  # denormalize
+            results.append({
+                'name':   item['name'],
+                'signer': item['signer'],
+                'gloss':  item['gloss'],
+                'text':   item['text'],
+                'sign':   sign.float(),
+            })
+
+        os.makedirs('results', exist_ok=True)
+        import gzip
+        out_path = 'results/predictions_test.pt.gz'
+        with gzip.open(out_path, 'wb') as f:
+            torch.save(results, f)
+        print(f"Saved {len(results)} predictions to {out_path}")
+        self._test_outputs = []
+
     def points2imgs(self, points, skel_len):
         bs, t, v = points.size()
         video = torch.zeros(bs, t, 3, 128, 128)
@@ -691,7 +728,7 @@ class Point2textModelStage2(pl.LightningModule):
             for i in range(cur_len):
                 cur_frame = cur_points[i].cpu().numpy() # [150]
                 frame = np.ones((256, 256, 3), np.uint8) * 255
-                frame_joints_2d = np.reshape(cur_frame, (50, 3))[:, :2]
+                frame_joints_2d = np.reshape(cur_frame, (61, 3))[:, :2]
                 # Draw the frame given 2D joints
                 im = draw_frame_2D(frame, frame_joints_2d) # [h, w, c]
                 im = torch.FloatTensor(im).permute(2,0,1).contiguous()
@@ -753,7 +790,7 @@ class Point2textModelStage2(pl.LightningModule):
         for j in range(vis_len):
             frame_joints = points[j]
             frame = np.ones((512, 512, 3), np.uint8) * 255
-            frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
+            frame_joints_2d = np.reshape(frame_joints, (61, 3))[:, :2]
             # Draw the frame given 2D joints
             im = draw_frame_2D(frame, frame_joints_2d)
             show_img.append(im)

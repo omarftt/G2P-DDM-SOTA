@@ -19,7 +19,9 @@ from pytorch_lightning.strategies.ddp import DDPStrategy
 def main():
     pl.seed_everything(1234)
     parser = argparse.ArgumentParser()
-    parser.add_argument('--stage2_model', type=str, help='stage2 mode config')
+    parser.add_argument('--stage2_model', type=str, help='stage2 model config yaml')
+    parser.add_argument('--test_ckpt', type=str, default='',
+                        help='If set, run test inference instead of training')
     # parser = Point2textModelStage2.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
     opt = TrainOptions(parser).parse()
@@ -39,7 +41,7 @@ def main():
     get_parameter_number(model)
     
     callbacks = []
-    model_save_ccallback = ModelCheckpoint(monitor="val/rec_wer", filename='{epoch}-{step}-{val/rec_wer:4f}', save_top_k=10, mode="min")
+    model_save_ccallback = ModelCheckpoint(monitor="val/rec_wer", filename='{epoch}-{step}-{val/rec_wer:4f}', save_top_k=1, save_last=True, mode="min")
     # early_stop_callback = EarlyStopping(monitor="test_wer", min_delta=0.00, patience=100, verbose=False, mode="min")
     callbacks.append(model_save_ccallback)
     # callbacks.append(early_stop_callback)
@@ -54,9 +56,12 @@ def main():
     trainer = pl.Trainer.from_argparse_args(opt, callbacks=callbacks, 
                                             max_steps=200000000, **kwargs)
 
-    trainer.validate(model, dataloaders=data.val_dataloader())
-    # trainer.validate(model, dataloaders=data.test_dataloader())
-    # trainer.fit(model, data)
+    if opt.test_ckpt:
+        model = instantiate_from_config(config.model)
+        model = model.__class__.load_from_checkpoint(opt.test_ckpt, strict=False)
+        trainer.test(model, dataloaders=data.test_dataloader())
+    else:
+        trainer.fit(model, data)
 
 
 if __name__ == "__main__":

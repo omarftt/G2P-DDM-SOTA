@@ -37,7 +37,7 @@ class PoseVQVAE(pl.LightningModule):
         self.spa_pos_emb.data.normal_(0, 0.02)
 
         # self.points_emb = nn.Linear(150, 256)
-        self.pose_emb = nn.Linear(24, args.embedding_dim)
+        self.pose_emb = nn.Linear(57, args.embedding_dim)
         self.rhand_emb = nn.Linear(63, args.embedding_dim)
         self.lhand_emb = nn.Linear(63, args.embedding_dim)
 
@@ -51,7 +51,7 @@ class PoseVQVAE(pl.LightningModule):
         self.dec_tem_vit = Encoder(dim=args.embedding_dim, depth=3, heads=8, mlp_dim=args.embedding_dim * 4, dropout = 0.1)
         self.dec_spa_vit = Encoder(dim=args.embedding_dim, depth=3, heads=8, mlp_dim=args.embedding_dim * 4, dropout = 0.1)
         self.dec_linear = nn.Linear(args.embedding_dim, args.embedding_dim)
-        self.pose_spl = SPL(input_size=args.embedding_dim, hidden_layers=5, hidden_units=args.embedding_dim, joint_size=3, reuse=False, sparse=False, SKELETON="sign_pose")        
+        self.pose_spl = SPL(input_size=args.embedding_dim, hidden_layers=5, hidden_units=args.embedding_dim, joint_size=3, reuse=False, sparse=False, SKELETON="sign_pose_19")
         self.hand_spl = SPL(input_size=args.embedding_dim, hidden_layers=5, hidden_units=args.embedding_dim, joint_size=3, reuse=False, sparse=False, SKELETON="sign_hand")
 
         self.save_hyperparameters()
@@ -66,9 +66,9 @@ class PoseVQVAE(pl.LightningModule):
         """points: [b t h]
            points_mask: [b t]
         """
-        pose = points[:, :, :24]
-        rhand = points[:, :, 24:24+63]
-        lhand = points[:, :, 87:150]
+        pose = points[:, :, :57]
+        rhand = points[:, :, 57:120]
+        lhand = points[:, :, 120:183]
         b = pose.size(0)
 
         pose = self.pose_emb(pose).unsqueeze_(-2) # [bs, t, 1, 256]
@@ -158,9 +158,9 @@ class PoseVQVAE(pl.LightningModule):
         dec_points = torch.cat([dec_pose, dec_rhand, dec_lhand], dim=-1) # [bs*max_len, 150]
 
         ori_points = einops.rearrange(points, "b t v -> (b t) v")
-        pose = ori_points[:, :24]
-        rhand = ori_points[:, 24:24+63]
-        lhand = ori_points[:, 87:150]
+        pose = ori_points[:, :57]
+        rhand = ori_points[:, 57:120]
+        lhand = ori_points[:, 120:183]
 
         ori_mask = self._get_mask(skel_len, max_len, points.device)
         rec_loss = torch.abs(dec_points - ori_points)[ori_mask.view(-1)].mean()
@@ -283,7 +283,7 @@ class PoseVQVAE(pl.LightningModule):
             for i in range(cur_len):
                 cur_frame = cur_points[i].cpu().numpy() # [150]
                 frame = np.ones((256, 256, 3), np.uint8) * 255
-                frame_joints_2d = np.reshape(cur_frame, (50, 3))[:, :2]
+                frame_joints_2d = np.reshape(cur_frame, (61, 3))[:, :2]
                 # Draw the frame given 2D joints
                 im = draw_frame_2D(frame, frame_joints_2d) # [h, w, c]
                 im = torch.FloatTensor(im).permute(2,0,1).contiguous()
@@ -336,7 +336,7 @@ class PoseVQVAE(pl.LightningModule):
         for j in range(vis_len):
             frame_joints = points[j]
             frame = np.ones((256, 256, 3), np.uint8) * 255
-            frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
+            frame_joints_2d = np.reshape(frame_joints, (61, 3))[:, :2]
             # Draw the frame given 2D joints
             im = draw_frame_2D(frame, frame_joints_2d)
             show_img.append(im)
