@@ -50,11 +50,11 @@ def main():
     if opt.gpus > 1:
         kwargs = dict(
             check_val_every_n_epoch=2,
-            accelerator='gpu',
+            accelerator='cuda',
             gpus=opt.gpus,
             strategy=DDPStrategy(find_unused_parameters=False))
     elif opt.gpus == 1:
-        kwargs = dict(accelerator='gpu')
+        kwargs = dict(accelerator='auto')
     trainer = pl.Trainer.from_argparse_args(opt, callbacks=callbacks, 
                                             max_steps=200000000, **kwargs)
 
