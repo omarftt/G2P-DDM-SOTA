@@ -44,7 +44,7 @@ def plot_video(joints,
         frame_joints = frame_joints[:-1] * 3
 
         # Reduce the frame joints down to 2D for visualisation - Frame joints 2d shape is (48,2)
-        frame_joints_2d = np.reshape(frame_joints, (50, 3))[:, :2]
+        frame_joints_2d = np.reshape(frame_joints, (-1, 3))[:, :2]
         # Draw the frame given 2D joints
         draw_frame_2D(frame, frame_joints_2d)
 
@@ -62,7 +62,7 @@ def plot_video(joints,
             ref_joints = ref_joints[:-1] * 3
 
             # Reduce the frame joints down to 2D- Frame joints 2d shape is (48,2)
-            ref_joints_2d = np.reshape(ref_joints, (50, 3))[:, :2]
+            ref_joints_2d = np.reshape(ref_joints, (-1, 3))[:, :2]
 
             # Draw these joints on the frame
             draw_frame_2D(ref_frame, ref_joints_2d)
@@ -240,7 +240,7 @@ def draw_frame_2D(frame, joints):
 
     # Increase the size and position of the joints
     joints = joints * 10 * 12 * 2
-    joints = joints + np.ones((50, 2)) * offset
+    joints = joints + np.ones_like(joints) * offset
 
     # Loop through each of the bone structures, and plot the bone
     for j in range(number):
