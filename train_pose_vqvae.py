@@ -44,6 +44,8 @@ def main():
     kwargs = dict()
     if opt.gpus > 1:
         kwargs = dict(accelerator='cuda', gpus=opt.gpus, strategy="ddp")
+    elif opt.gpus == 1:
+        kwargs = dict(accelerator='cuda', devices=1)
     trainer = pl.Trainer.from_argparse_args(
         opt, callbacks=callbacks, 
         max_steps=200000000, **kwargs)
