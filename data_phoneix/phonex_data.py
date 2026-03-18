@@ -75,37 +75,62 @@ class PoseDataset(data.Dataset):
         self.signers = []
         self.texts = []
 
-        import json as _json
-        _meta_lines = []
-        if os.path.exists(meta_file):
-            with open(meta_file, "r") as _fm:
-                _meta_lines = _fm.readlines()
+        cache_file = skel_file + ".cache.pt"
+        if os.path.exists(cache_file):
+            print(f"Loading cached data from {cache_file}")
+            cache = torch.load(cache_file, map_location='cpu', weights_only=False)
+            self.gloss = cache['gloss']
+            self.gloss_id = cache['gloss_id']
+            self.skel_3d = cache['skel_3d']
+            self.skel_len = cache['skel_len']
+            self.gloss_len = cache['gloss_len']
+            self.pred_leng = cache['pred_leng']
+            self.names = cache.get('names', [''] * len(self.gloss))
+            self.signers = cache.get('signers', [''] * len(self.gloss))
+            self.texts = cache.get('texts', [''] * len(self.gloss))
+        else:
+            import json as _json
+            _meta_lines = []
+            if os.path.exists(meta_file):
+                with open(meta_file, "r") as _fm:
+                    _meta_lines = _fm.readlines()
 
-        with open(gloss_file, "r") as f1, open(skel_file, "r") as f2, open(leng_file, "r") as f3:
-            for i, (gloss_line, skel_line, leng_line) in enumerate(zip(f1, f2, f3)):
-                # if i > 100: break
-                gloss = gloss_line.strip()
-                gloss_ids = text_dict.encode_line(gloss)
-                pred_leng = [int(x) for x in leng_line.strip().split()]
-                pred_leng.append(16)
-                gloss_len = len(gloss_ids)
-                skels_3d = torch.FloatTensor([float(s) for s in skel_line.strip().split()])
+            with open(gloss_file, "r") as f1, open(skel_file, "r") as f2, open(leng_file, "r") as f3:
+                for i, (gloss_line, skel_line, leng_line) in enumerate(zip(f1, f2, f3)):
+                    # if i > 100: break
+                    gloss = gloss_line.strip()
+                    gloss_ids = text_dict.encode_line(gloss)
+                    pred_leng = [int(x) for x in leng_line.strip().split()]
+                    pred_leng.append(16)
+                    gloss_len = len(gloss_ids)
+                    skels_3d = torch.FloatTensor([float(s) for s in skel_line.strip().split()])
 
-                # vid_path = os.path.join("/Dataset/everybody_sign_now_experiments/images", file_line.strip())
+                    assert len(skels_3d) % 184 == 0
+                    skel_len = len(skels_3d) // 184
 
-                assert len(skels_3d) % 184 == 0
-                skel_len = len(skels_3d) // 184
+                    meta = _json.loads(_meta_lines[i]) if i < len(_meta_lines) else {}
+                    self.gloss.append(gloss)
+                    self.gloss_id.append(gloss_ids)
+                    self.skel_3d.append(skels_3d)
+                    self.skel_len.append(skel_len)
+                    self.gloss_len.append(gloss_len)
+                    self.pred_leng.append(pred_leng)
+                    self.names.append(meta.get('name', ''))
+                    self.signers.append(meta.get('signer', ''))
+                    self.texts.append(meta.get('text', ''))
 
-                meta = _json.loads(_meta_lines[i]) if i < len(_meta_lines) else {}
-                self.gloss.append(gloss)
-                self.gloss_id.append(gloss_ids)
-                self.skel_3d.append(skels_3d)
-                self.skel_len.append(skel_len)
-                self.gloss_len.append(gloss_len)
-                self.pred_leng.append(pred_leng)
-                self.names.append(meta.get('name', ''))
-                self.signers.append(meta.get('signer', ''))
-                self.texts.append(meta.get('text', ''))
+            print(f"Saving cache to {cache_file}")
+            torch.save({
+                'gloss': self.gloss,
+                'gloss_id': self.gloss_id,
+                'skel_3d': self.skel_3d,
+                'skel_len': self.skel_len,
+                'gloss_len': self.gloss_len,
+                'pred_leng': self.pred_leng,
+                'names': self.names,
+                'signers': self.signers,
+                'texts': self.texts,
+            }, cache_file)
 
         self.input_shape = 128
         self.transform = transforms.Compose([

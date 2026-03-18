@@ -120,11 +120,14 @@ class SPL(nn.Module):
                 for parent in tree[parent_id][0]:
                     get_all_parents(parent_list, parent, tree)
 
-        self.prediction_order = list()
         self.indexed_skeleton = dict()
 
-        # Reorder the structure so that we can access joint information by using its index.
-        self.prediction_order = list(range(len(kinematic_tree)))  # 比起kinematic_tree，丰富了层级结构
+        # Build prediction order from skeleton BFS layers (ensures parents before children)
+        self.prediction_order = []
+        for joint_list in self.skeleton:
+            for joint_entry in joint_list:
+                self.prediction_order.append(joint_entry[1])
+
         for joint_id in self.prediction_order:
             joint_entry = kinematic_tree[joint_id]
             if self.sparse_spl:
@@ -133,20 +136,20 @@ class SPL(nn.Module):
                 parent_list_ = list()
                 if len(joint_entry[0]) > 0:
                     get_all_parents(parent_list_, joint_entry[0][0], kinematic_tree)
-                
+
                 new_entry = [parent_list_, joint_entry[1], joint_entry[2]]
             self.indexed_skeleton[joint_id] = new_entry
-        
-        # print("indexed_skeleton: ", self.indexed_skeleton)
-        
-        self.joint_predictions = nn.ModuleList()
 
-        for joint_key in self.prediction_order:
+        self.joint_predictions = nn.ModuleList()
+        self._pred_idx = {}  # map joint_key -> ModuleList index
+
+        for idx, joint_key in enumerate(self.prediction_order):
             parent_joint_ids, joint_id, joint_name = self.indexed_skeleton[joint_key]
 
             input_size = self.input_size
             input_size += self.joint_size*len(parent_joint_ids)
             self.joint_predictions.append(SP_block(input_size, self.hid_size, self.joint_size, self.L_num))
+            self._pred_idx[joint_key] = idx
 
     def forward(self, x):
         out = dict()
@@ -159,9 +162,9 @@ class SPL(nn.Module):
                 xinput = torch.cat(xinput, dim=-1)
             else:
                 xinput = x
-            out[joint_key] = self.joint_predictions[joint_key](xinput)
-        
-        prediction = torch.cat(list(out.values()), dim= -1)
+            out[joint_key] = self.joint_predictions[self._pred_idx[joint_key]](xinput)
+
+        prediction = torch.cat([out[k] for k in sorted(out.keys())], dim=-1)
         return prediction
 
 

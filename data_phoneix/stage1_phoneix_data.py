@@ -65,24 +65,42 @@ class PoseDataset(data.Dataset):
         self.skel_3d = []
         self.skel_len = []
         self.gloss_len = []
-        with open(gloss_file, "r") as f1, open(skel_file, "r") as f2:
-            for i, (gloss_line, skel_line) in enumerate(zip(f1, f2)):
-                # if i > 100: break
-                gloss = gloss_line.strip()
-                gloss_ids = text_dict.encode_line(gloss, append_eos=False)
-                gloss_len = len(gloss_ids)
-                skels_3d = torch.FloatTensor([float(s) for s in skel_line.strip().split()])
-                # print("len(skels_3d): ", len(skels_3d))
 
-                assert len(skels_3d) % 184 == 0
-                skel_len = len(skels_3d) // 184
-                
+        cache_file = skel_file + ".cache.pt"
+        if os.path.exists(cache_file):
+            print(f"Loading cached data from {cache_file}")
+            cache = torch.load(cache_file, map_location='cpu', weights_only=False)
+            self.gloss = cache['gloss']
+            self.gloss_id = cache['gloss_id']
+            self.skel_3d = cache['skel_3d']
+            self.skel_len = cache['skel_len']
+            self.gloss_len = cache['gloss_len']
+        else:
+            with open(gloss_file, "r") as f1, open(skel_file, "r") as f2:
+                for i, (gloss_line, skel_line) in enumerate(zip(f1, f2)):
+                    # if i > 100: break
+                    gloss = gloss_line.strip()
+                    gloss_ids = text_dict.encode_line(gloss, append_eos=False)
+                    gloss_len = len(gloss_ids)
+                    skels_3d = torch.FloatTensor([float(s) for s in skel_line.strip().split()])
 
-                self.gloss.append(gloss)
-                self.gloss_id.append(gloss_ids)         
-                self.skel_3d.append(skels_3d)
-                self.skel_len.append(skel_len)  
-                self.gloss_len.append(gloss_len)       
+                    assert len(skels_3d) % 184 == 0
+                    skel_len = len(skels_3d) // 184
+
+                    self.gloss.append(gloss)
+                    self.gloss_id.append(gloss_ids)
+                    self.skel_3d.append(skels_3d)
+                    self.skel_len.append(skel_len)
+                    self.gloss_len.append(gloss_len)
+
+            print(f"Saving cache to {cache_file}")
+            torch.save({
+                'gloss': self.gloss,
+                'gloss_id': self.gloss_id,
+                'skel_3d': self.skel_3d,
+                'skel_len': self.skel_len,
+                'gloss_len': self.gloss_len,
+            }, cache_file)       
 
     def __len__(self):
         return len(self.gloss)
