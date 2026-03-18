@@ -41,7 +41,7 @@ def main():
     get_parameter_number(model)
     
     callbacks = []
-    model_save_ccallback = ModelCheckpoint(monitor="val/rec_wer", filename='{epoch}-{step}-{val/rec_wer:4f}', save_top_k=1, save_last=True, mode="min")
+    model_save_ccallback = ModelCheckpoint(monitor="val/rec_dtw", filename='{epoch}-{step}-{val/rec_dtw:4f}', save_top_k=1, save_last=True, mode="min")
     # early_stop_callback = EarlyStopping(monitor="test_wer", min_delta=0.00, patience=100, verbose=False, mode="min")
     callbacks.append(model_save_ccallback)
     # callbacks.append(early_stop_callback)
