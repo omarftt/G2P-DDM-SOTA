@@ -138,7 +138,7 @@ class PoseVQVAE(pl.LightningModule):
         return dec_pose, dec_rhand, dec_lhand
 
 
-    def forward(self, batch, mode, vis_func, vis_tok_func):
+    def forward(self, batch, mode, vis_func, vis_tok_func, batch_idx=0):
         """[bs, t, 150]
         """
         gloss_id = batch["gloss_id"]   # [bs, src_len]
@@ -170,7 +170,7 @@ class PoseVQVAE(pl.LightningModule):
             vis_func(dec_pose, dec_rhand, dec_lhand, mode, "recons", vis_len=skel_len[0].item())
             vis_func(pose, rhand, lhand, mode, "origin", vis_len=skel_len[0].item())
             vis_tok_func(vq_tokens[0, :skel_len[0].item()], mode, "rec")
-        elif mode == "val":
+        elif mode == "val" and batch_idx == 0:
             vis_func(dec_pose, dec_rhand, dec_lhand, mode, "recons", vis_len=skel_len[0].item())
             vis_func(pose, rhand, lhand, mode, "origin", vis_len=skel_len[0].item())
             vis_tok_func(vq_tokens[0, :skel_len[0].item()], mode, "rec")
@@ -185,7 +185,7 @@ class PoseVQVAE(pl.LightningModule):
         return loss
     
     def validation_step(self, batch, batch_idx):
-        self.forward(batch, "val", self.vis, self.vis_token)
+        self.forward(batch, "val", self.vis, self.vis_token, batch_idx=batch_idx)
 
     
     # def validation_step(self, batch, batch_idx):

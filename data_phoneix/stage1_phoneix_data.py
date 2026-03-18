@@ -177,6 +177,7 @@ class PhoenixPoseData(pl.LightningDataModule):
             batch_size=self.args.batchSize,
             num_workers=self.args.num_workers,
             pin_memory=True,
+            persistent_workers=self.args.num_workers > 0,
             sampler=sampler,
             shuffle=False,
             collate_fn=dataset.collate_fn
