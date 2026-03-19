@@ -16,7 +16,6 @@ import einops
 from modules.sp_layer import SPL
 from util.plot_videos import draw_frame_2D
 from util.wer import get_wer_delsubins
-import ctcdecode
 from itertools import groupby
 from modules.mask_strategy import *
 from util.dtw import calculate_dtw, dtw
