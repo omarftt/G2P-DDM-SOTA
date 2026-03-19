@@ -12,14 +12,12 @@ model:
     empty_text_prob: 0.1
     unconditional_guidance_scale: 2.0
     sample_dir: experiments/text2pose/vq_diffusion/sampler_cfg
-    vocab_file: Data/ProgressiveTransformersSLP/src_vocab.txt
+    vocab_file: data_in/ProgressiveTransformersSLP/src_vocab.txt
     resume_ckpt: ""
     stage1_model_config:
       target: stage1_models.pose_vqvae_sep.PoseVQVAE
-      ckpt_path: experiments/pose_vqvae/separate/lightning_logs/version_0/checkpoints/epoch=378-step=28046-val_wer=0.0000-val_rec_loss=0.0113-val_ce_loss=0.0000.ckpt
-      # target: stage1_models.pose_vqvae.PoseVQVAE
-      # ckpt_path: experiments/pose_vqvae/lightning_logs/version_2/checkpoints/epoch=113-step=16872-val_wer=0.0000-val_rec_loss=0.0124-val_ce_loss=0.0000.ckpt
-    backtrans_model_config: 
+      ckpt_path: experiments/pose_vqvae/separate/lightning_logs/version_0/checkpoints/epoch=749-step=55500-val_wer=0.0000-val_rec_loss=0.1321-val_ce_loss=0.0000.ckpt
+    backtrans_model_config:
       target: backmodels.point2text_model.BackTranslateModel
       ckpt_path: experiments/backmodel/lightning_logs/small_v0/checkpoints/epoch=21-step=19514-val_wer=0.5195.ckpt
 
@@ -30,5 +28,5 @@ data:
       batchSize: 16
       num_workers: 32
       max_frames_num: 300
-      data_path: Data/ProgressiveTransformersSLP
-      vocab_file: Data/ProgressiveTransformersSLP/src_vocab.txt
+      data_path: data_in/ProgressiveTransformersSLP
+      vocab_file: data_in/ProgressiveTransformersSLP/src_vocab.txt
