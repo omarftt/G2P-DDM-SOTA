@@ -49,7 +49,7 @@ def main():
     kwargs = dict()
     if opt.gpus > 1:
         kwargs = dict(
-            check_val_every_n_epoch=2,
+            check_val_every_n_epoch=5,
             accelerator='cuda',
             gpus=opt.gpus,
             strategy=DDPStrategy(find_unused_parameters=False))
