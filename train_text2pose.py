@@ -22,6 +22,8 @@ def main():
     parser.add_argument('--stage2_model', type=str, help='stage2 model config yaml')
     parser.add_argument('--test_ckpt', type=str, default='',
                         help='If set, run test inference instead of training')
+    parser.add_argument('--test_split', type=str, default='test', choices=['test', 'dev'],
+                        help='Which split to run inference on (default: test)')
     # parser = Point2textModelStage2.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)
     opt = TrainOptions(parser).parse()
@@ -61,7 +63,11 @@ def main():
     if opt.test_ckpt:
         model = instantiate_from_config(config.model)
         model = model.__class__.load_from_checkpoint(opt.test_ckpt, strict=False)
-        trainer.test(model, dataloaders=data.test_dataloader())
+        model._test_split = opt.test_split
+        if opt.test_split == 'dev':
+            trainer.test(model, dataloaders=data.val_dataloader())
+        else:
+            trainer.test(model, dataloaders=data.test_dataloader())
     else:
         trainer.fit(model, data)
 

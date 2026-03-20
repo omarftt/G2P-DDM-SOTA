@@ -708,7 +708,8 @@ class Point2textModelStage2(pl.LightningModule):
 
         os.makedirs('results', exist_ok=True)
         import gzip
-        out_path = 'results/predictions_test.pt.gz'
+        split_name = getattr(self, '_test_split', 'test')
+        out_path = f'results/predictions_{split_name}.pt.gz'
         with gzip.open(out_path, 'wb') as f:
             torch.save(results, f)
         print(f"Saved {len(results)} predictions to {out_path}")
