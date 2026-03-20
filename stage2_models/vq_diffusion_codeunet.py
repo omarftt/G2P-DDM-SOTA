@@ -690,8 +690,8 @@ class Point2textModelStage2(pl.LightningModule):
     def on_test_epoch_end(self):
         if self.global_rank != 0:
             return
-        mean = np.load('Data/ProgressiveTransformersSLP/mean_183.npy')
-        std  = np.load('Data/ProgressiveTransformersSLP/std_183.npy')
+        mean = np.load('data_in/ProgressiveTransformersSLP/mean_183.npy')
+        std  = np.load('data_in/ProgressiveTransformersSLP/std_183.npy')
         mean_t = torch.FloatTensor(mean)
         std_t  = torch.FloatTensor(std)
 
